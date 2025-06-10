@@ -1,20 +1,36 @@
-require("dotenv").config();
+// index.js (or server.js)
 
-const app = require("./app");
-const { default: mongoose } = require("mongoose");
+const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+const cron = require("node-cron");
 
-const port = process.env.PORT || 5000;
-const uri = process.env.MONGODB_URI;
+dotenv.config();
+
+const UpdateDeliveryAndPaymentStatus = require("./utils/UpdateDeliveryAndPaymentStatus/UpdateDeliveryAndPaymentStatus");
+
+// MongoDB connection
+const MONGODB_URI = process.env.MONGODB_URI;
 
 mongoose
-  .connect(uri)
+  .connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => {
-    console.log("Connected to MongoDB");
+    console.log("MongoDB connected.");
+
+    // Start the cron job (every 2 minutes)
+    cron.schedule("*/2 * * * *", () => {
+      console.log("Running UpdateDeliveryAndPaymentStatus job...");
+      UpdateDeliveryAndPaymentStatus().catch((err) =>
+        console.error("Error in UpdateDeliveryAndPaymentStatus:", err)
+      );
+    });
   })
   .catch((err) => {
-    console.log(err);
+    console.error("Error connecting to MongoDB:", err);
   });
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+// Optional: graceful shutdown
+process.on("SIGINT", async () => {
+  console.log("Closing MongoDB connection...");
+  await mongoose.disconnect();
+  process.exit(0);
 });
